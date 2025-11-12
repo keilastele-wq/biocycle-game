@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Biocycle - Gestão de Resíduos Hospitalares</title>
+    <title>Biocycle - Treinamento em Gestão de Resíduos Hospitalares</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     
     <style>
         body {
-            <body class="h-screen w-screen bg-slate-100 pattern-grid flex flex-col overflow-hidden">
             font-family: 'Inter', sans-serif;
             touch-action: none; /* Previne scroll ao arrastar itens no mobile */
             overflow: hidden;
@@ -79,7 +78,8 @@
         }
     </style>
 </head>
-<body class="h-screen w-screen bg-slate-100 pattern-grid flex flex-col items-center justify-center overflow-hidden">
+
+<body class="h-screen w-screen bg-slate-100 pattern-grid flex flex-col overflow-hidden">
 
     <div id="start-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm p-4">
         <div class="text-center max-w-md w-full animate-float">
@@ -87,7 +87,7 @@
                 <span>💉</span><span>🧴</span><span>🗑️</span>
             </div>
             <h1 class="text-5xl font-extrabold text-slate-800 mb-2 tracking-tight">Bio<span class="text-green-500">cycle</span></h1>
-            <p class="text-slate-600 text-lg mb-8">Treinamento - Gestão de resíduos hospitalares</p>
+            <p class="text-slate-600 text-lg mb-8">Treinamento- Gestão de Resíduos Hospitalares</p>
             
             <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-200">
                 <label class="block text-left text-sm font-bold text-slate-700 mb-2">Seu Nome (Para o Certificado)</label>
@@ -195,6 +195,9 @@
     </div>
 
     <script>
+        // ### PASSO 1: INICIAR MOTOR DE ÁUDIO ###
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
         // --- CONFIGURAÇÃO DO JOGO ---
         const GAME_DURATION = 45; // Segundos
         let score = 0;
@@ -237,6 +240,9 @@
         // --- LÓGICA DO JOGO ---
 
         function startGame() {
+            // ### PASSO 2: ATIVAR SOM NO CLIQUE ###
+            audioCtx.resume(); 
+
             const nameInput = document.getElementById('player-name').value.trim();
             if (nameInput) playerName = nameInput;
 
@@ -390,6 +396,55 @@
         };
 
 
+        // ### PASSO 3: FUNÇÕES DE SOM ###
+        
+        /**
+         * Toca uma nota simples
+         * @param {number} frequency - Frequência da nota (ex: 440 para "Lá")
+         * @param {string} type - Tipo de onda ('sine', 'square', 'sawtooth', 'triangle')
+         * @param {number} duration - Duração em segundos
+         * @param {number} [volume=0.1] - Volume (0.0 a 1.0)
+         */
+        function playNote(frequency, type, duration, volume = 0.1) {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        // Som para quando o jogador ACERTA
+        function playCorrectSound() {
+            // Toca um "ping!" agudo e curto
+            playNote(800, 'sine', 0.15, 0.08);
+        }
+
+        // Som para quando o jogador ERRA
+        function playIncorrectSound() {
+            // Toca um "buzz" grave e distorcido
+            playNote(150, 'sawtooth', 0.3, 0.08);
+        }
+
+        // Som de "Vitória" / Fogos (um jingle simples)
+        function playEndSound() {
+            // Toca um jingle de 3 notas (Dó, Sol, Dó alto)
+            playNote(261.63, 'sine', 0.2); // C4
+            setTimeout(() => playNote(392.00, 'sine', 0.2), 150); // G4
+            setTimeout(() => playNote(523.25, 'sine', 0.3), 300); // C5
+        }
+        // --- FIM DAS FUNÇÕES DE SOM ---
+
+
         function checkAnswer(binType) {
             if (!currentItem) return;
 
@@ -397,11 +452,13 @@
                 // Acerto
                 score += 100;
                 updateScore(score);
+                playCorrectSound(); // ### PASSO 4: CHAMAR SOM DE ACERTO ###
                 spawnItem(); // Spawna um novo item após o acerto
             } else {
                 // Erro
                 score = Math.max(0, score - 50); // Garante que a pontuação não fica negativa
                 updateScore(score);
+                playIncorrectSound(); // ### PASSO 4: CHAMAR SOM DE ERRO ###
                 showFeedback(currentItem.tip); // Mostra a dica de erro
             }
         }
@@ -431,6 +488,8 @@
 
         function endGame() {
             clearInterval(timerInterval); // Para o contador de tempo
+            playEndSound(); // ### PASSO 4: CHAMAR SOM DE FIM DE JOGO ###
+            
             document.getElementById('game-ui').classList.add('hidden');
             document.getElementById('end-screen').classList.remove('hidden');
             
@@ -443,5 +502,3 @@
     </script>
 </body>
 </html>
-
-
