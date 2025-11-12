@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Biocycle - Apresentação</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
+            overflow: hidden;
+            background-color: #f0f9ff;
+            user-select: none; /* Impede seleção de texto durante o jogo */
+        }
+        
+        .pattern-grid {
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Animações */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
+
+        .item-card {
+            cursor: grab;
+            transition: transform 0.1s;
+            /* Importante para o drag funcionar bem */
+            position: absolute; 
+            z-index: 50;
+        }
+        .item-card:active {
+            cursor: grabbing;
+            transform: scale(1.1);
+        }
+
+        /* Estilo das Lixeiras */
+        .bin-zone {
+            transition: all 0.3s;
+        }
+        .bin-zone.drag-over {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .bin-infectante { background-color: #ffffff; border: 4px solid #e5e7eb; color: #333; }
+        .bin-comum { background-color: #1f2937; border: 4px solid #000; color: white; }
+        .bin-perfuro { background-color: #fbbf24; border: 4px solid #d97706; color: #78350f; }
+        .bin-reciclavel { background-color: #3b82f6; border: 4px solid #1d4ed8; color: white; }
+
+        .certificate-border {
+            border: 8px double #fbbf24;
+            background-color: #fff;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen bg-slate-100 pattern-grid flex flex-col items-center justify-center overflow-hidden">
+
+    <!-- Tela Inicial -->
+    <div id="start-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm p-4">
+        <div class="text-center max-w-md w-full animate-float">
+            <div class="mb-4 flex justify-center gap-4 text-5xl">
+                <span>💉</span><span>🧴</span><span>🗑️</span>
+            </div>
+            <h1 class="text-5xl font-extrabold text-slate-800 mb-2 tracking-tight">Bio<span class="text-green-500">cycle</span></h1>
+            <p class="text-slate-600 text-lg mb-8">O Desafio da Biossegurança</p>
+            
+            <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-200">
+                <label class="block text-left text-sm font-bold text-slate-700 mb-2">Nome do Participante</label>
+                <input type="text" id="player-name" placeholder="Ex: Dr. Carlos" class="w-full p-3 border border-slate-300 rounded-lg mb-4 focus:ring-2 focus:ring-green-500 outline-none">
+                
+                <button onclick="startGame()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl text-xl shadow-lg transform transition active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fas fa-play"></i> INICIAR SIMULAÇÃO
+                </button>
+            </div>
+
+            <div class="mt-8 opacity-70">
+                <h3 class="font-bold text-slate-500 text-xs uppercase tracking-wider mb-2">Ranking Global (Simulado)</h3>
+                <div id="leaderboard-list" class="w-full text-left text-sm bg-slate-100 p-3 rounded">
+                    <!-- Ranking Falso é preenchido via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- UI do Jogo -->
+    <!-- MODIFICAÇÃO: Removido 'h-full' para permitir que o flex-1 controle a altura corretamente -->
+    <div id="game-ui" class="hidden w-full max-w-4xl flex-1 flex flex-col relative">
+        
+        <!-- Barra Superior (Placar, Tempo) -->
+        <div class="flex justify-between items-center p-4 bg-white shadow-sm rounded-b-xl mx-2 mt-2 z-10">
+            <div class="flex flex-col">
+                <span class="text-xs text-slate-400 font-bold uppercase">Pontos</span>
+                <span id="score-display" class="text-2xl font-black text-slate-800">0</span>
+            </div>
+            <div class="flex flex-col items-center w-1/2">
+                 <div class="text-xs text-slate-400 font-bold uppercase mb-1">Tempo Restante</div>
+                 <div class="w-full h-4 bg-slate-200 rounded-full overflow-hidden border border-slate-300">
+                     <div id="time-bar" class="h-full bg-green-500 w-full transition-all duration-1000 linear"></div>
+                 </div>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-xs text-slate-400 font-bold uppercase">Status</span>
+                <span class="text-xl font-bold text-blue-600">Treinando</span>
+            </div>
+        </div>
+
+        <!-- Área Central (Item) -->
+        <div class="flex-1 flex items-center justify-center relative perspective-1000">
+            
+            <!-- Feedback de Erro -->
+            <div id="feedback-msg" class="hidden absolute top-10 bg-red-100 text-red-800 px-6 py-3 rounded-xl font-bold shadow-2xl z-50 text-center max-w-sm text-lg border-2 border-red-300">
+                Erro!
+            </div>
+
+            <!-- Spawner do Item -->
+            <div id="spawner" class="relative w-40 h-40 flex items-center justify-center z-40">
+                <!-- Item é gerado via JS -->
+            </div>
+        </div>
+
+        <!-- Lixeiras -->
+        <div class="grid grid-cols-4 gap-2 p-2 pb-4 h-auto items-end z-0">
+            
+            <!-- Comum -->
+            <div class="bin-zone h-40 rounded-xl flex flex-col items-center justify-end relative group bin-comum cursor-pointer" onclick="clickBin('comum')" data-type="comum">
+                <div class="absolute -top-6 text-4xl group-hover:-translate-y-2 transition-transform">⬛</div>
+                <div class="text-center p-2 w-full h-full flex flex-col justify-end">
+                    <span class="block font-bold text-sm uppercase">Comum</span>
+                    <span class="text-[10px] opacity-70 leading-tight hidden sm:block">Papel sujo, restos</span>
+                </div>
+            </div>
+
+            <!-- Reciclável -->
+            <div class="bin-zone h-40 rounded-xl flex flex-col items-center justify-end relative group bin-reciclavel cursor-pointer" onclick="clickBin('reciclavel')" data-type="reciclavel">
+                <div class="absolute -top-6 text-4xl group-hover:-translate-y-2 transition-transform">♻️</div>
+                <div class="text-center p-2 w-full h-full flex flex-col justify-end">
+                    <span class="block font-bold text-sm uppercase">Reciclável</span>
+                    <span class="text-[10px] opacity-70 leading-tight hidden sm:block">Plástico, Papel limpo</span>
+                </div>
+            </div>
+
+            <!-- Infectante -->
+            <div class="bin-zone h-40 rounded-xl flex flex-col items-center justify-end relative group bin-infectante cursor-pointer" onclick="clickBin('infectante')" data-type="infectante">
+                <div class="absolute -top-6 text-4xl group-hover:-translate-y-2 transition-transform">☣️</div>
+                <div class="text-center p-2 w-full h-full flex flex-col justify-end border-t border-slate-200">
+                    <span class="block font-bold text-sm uppercase text-red-600">Infectante</span>
+                    <span class="text-[10px] text-slate-500 leading-tight hidden sm:block">Sangue, biológico</span>
+                </div>
+            </div>
+
+            <!-- Perfuro -->
+            <div class="bin-zone h-40 rounded-xl flex flex-col items-center justify-end relative group bin-perfuro cursor-pointer" onclick="clickBin('perfuro')" data-type="perfuro">
+                <div class="absolute -top-6 text-4xl group-hover:-translate-y-2 transition-transform">💉</div>
+                <div class="text-center p-2 w-full h-full flex flex-col justify-end border-t border-yellow-600">
+                    <span class="block font-bold text-sm uppercase text-yellow-900">Perfuro</span>
+                    <span class="text-[10px] text-yellow-800 leading-tight hidden sm:block">Agulhas, vidro</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Tela Final (Certificado) -->
+    <div id="end-screen" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur p-4">
+        <div class="bg-white text-slate-800 p-8 rounded-lg shadow-2xl max-w-md w-full text-center certificate-border relative overflow-hidden transform scale-100">
+            
+            <!-- Detalhe decorativo -->
+            <div class="absolute top-0 right-0 -mr-10 -mt-10 w-32 h-32 bg-yellow-400 rotate-45 z-0"></div>
+
+            <div class="relative z-10">
+                <i class="fas fa-award text-7xl text-yellow-500 mb-4 drop-shadow-md animate-pop"></i>
+                <h2 class="text-3xl font-serif font-bold mb-1 text-slate-900">Certificado</h2>
+                <p class="text-sm text-slate-500 mb-6">Treinamento Biocycle - Gestão de Resíduos</p>
+
+                <div class="mb-6 bg-slate-50 p-4 rounded border border-slate-200">
+                    <p class="text-lg text-slate-600">Certificamos que</p>
+                    <p id="cert-name" class="text-3xl font-bold text-blue-800 my-2">Nome</p>
+                    <p class="text-lg text-slate-600">fez</p>
+                    <p id="final-score" class="text-5xl font-black text-green-600 mt-2">0 pts</p>
+                </div>
+
+                <button onclick="location.reload()" class="bg-blue-600 text-white px-6 py-4 rounded-lg font-bold shadow hover:bg-blue-700 transition w-full text-lg">
+                    <i class="fas fa-redo mr-2"></i> Jogar Novamente
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DADOS DO JOGO ---
+        const items = [
+            { id: 1, name: "Seringa com Agulha", type: "perfuro", icon: "💉", tip: "Agulhas vão na caixa rígida amarela (Perfuro)!" },
+            { id: 2, name: "Gaze com Sangue", type: "infectante", icon: "🩸", tip: "Sangue visível? Lixo Infectante (Branco)!" },
+            { id: 3, name: "Copo Plástico Limpo", type: "reciclavel", icon: "🥤", tip: "Plástico limpo não é lixo hospitalar. É reciclável (Azul)!" },
+            { id: 4, name: "Resto de Maçã", type: "comum", icon: "🍎", tip: "Resto de comida é lixo comum (Preto)." },
+            { id: 5, name: "Lâmina de Bisturi", type: "perfuro", icon: "🔪", tip: "Cuidado! Lâminas cortam. Lixo Perfuro (Amarelo)." },
+            { id: 6, name: "Papel Toalha (Mão)", type: "comum", icon: "🧻", tip: "Papel de secar mão vai no lixo comum (Preto)." },
+            { id: 7, name: "Ampola de Vidro", type: "perfuro", icon: "🧪", tip: "Vidro quebrado ou inteiro vai no Perfuro (Amarelo)." },
+            { id: 8, name: "Luva com Fluido", type: "infectante", icon: "🧤", tip: "Luva suja de fluido corporal é infectante (Branco)." },
+            { id: 9, name: "Caixa de Papelão", type: "reciclavel", icon: "📦", tip: "Papelão limpo é reciclável (Azul)." },
+            { id: 10, name: "Máscara Cirúrgica", type: "infectante", icon: "😷", tip: "Máscara usada no hospital é lixo infectante (Branco)." }
+        ];
+
+        // --- VARIÁVEIS ---
+        let score = 0;
+        let timeLeft = 45; // Duração da partida
+        let timerInterval;
+        let currentItem = null;
+        let playerName = "Visitante";
+
+        // --- INICIALIZAÇÃO ---
+        // Simula um ranking visualmente para a apresentação
+        function renderFakeLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = `
+                <div class="flex justify-between py-1 border-b border-slate-200"><span>🥇 Enf. Maria</span> <b>1200 pts</b></div>
+                <div class="flex justify-between py-1 border-b border-slate-200"><span>🥈 Dr. Paulo</span> <b>950 pts</b></div>
+                <div class="flex justify-between py-1"><span>🥉 Téc. Joana</span> <b>800 pts</b></div>
+            `;
+        }
+        renderFakeLeaderboard();
+
+        function startGame() {
+            const input = document.getElementById('player-name').value;
+            if(input.trim()) playerName = input;
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            
+            score = 0;
+            timeLeft = 45;
+            updateScore(0);
+            spawnItem();
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const percent = (timeLeft / 45) * 100;
+                const bar = document.getElementById('time-bar');
+                bar.style.width = percent + '%';
+                
+                if(percent < 30) bar.classList.replace('bg-green-500', 'bg-red-500');
+
+                if(timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        // --- LÓGICA DE ARRASTAR E CLICAR ---
+        function spawnItem() {
+            const spawner = document.getElementById('spawner');
+            spawner.innerHTML = '';
+            
+            currentItem = items[Math.floor(Math.random() * items.length)];
+
+            const el = document.createElement('div');
+            el.className = "item-card w-32 h-32 bg-white rounded-2xl shadow-2xl border-4 border-slate-200 flex flex-col items-center justify-center animate-pop hover:scale-105";
+            el.innerHTML = `
+                <div class="text-6xl mb-2 select-none pointer-events-none">${currentItem.icon}</div>
+                <div class="text-xs font-bold text-slate-600 text-center px-1 leading-tight select-none pointer-events-none">${currentItem.name}</div>
+            `;
+
+            // Habilitar Drag Desktop
+            el.draggable = true;
+            
+            // Drag Start
+            el.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', 'item'); // Necessário para Firefox
+                el.classList.add('opacity-50');
+            });
+            
+            el.addEventListener('dragend', () => {
+                el.classList.remove('opacity-50');
+            });
+
+            // Touch Events para Mobile/Tablet
+            setupTouch(el);
+
+            spawner.appendChild(el);
+        }
+
+        // Suporte a Touch (Celular/Tablet)
+        function setupTouch(el) {
+            let startX, startY, initialX, initialY;
+            
+            el.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = el.getBoundingClientRect();
+                startX = touch.clientX - rect.left;
+                startY = touch.clientY - rect.top;
+                
+                // Mover para o body para ter liberdade total de movimento
+                el.style.position = 'fixed';
+                el.style.zIndex = 1000;
+                el.style.width = rect.width + 'px';
+                el.style.left = (touch.clientX - startX) + 'px';
+                el.style.top = (touch.clientY - startY) + 'px';
+            }, {passive: false});
+
+            el.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                el.style.left = (touch.clientX - startX) + 'px';
+                el.style.top = (touch.clientY - startY) + 'px';
+                
+                // Highlight bins
+                highlightBinUnderTouch(touch.clientX, touch.clientY);
+            }, {passive: false});
+
+            el.addEventListener('touchend', (e) => {
+                const touch = e.changedTouches[0];
+                el.style.display = 'none'; // Esconde para detectar o elemento de baixo
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                el.style.display = 'flex';
+                
+                const bin = target ? target.closest('.bin-zone') : null;
+                
+                if (bin) {
+                    checkAnswer(bin.dataset.type);
+                } else {
+                    // Reseta se soltou fora
+                    spawnItem(); // Mais fácil respawnar do que animar volta
+                }
+                
+                // Remove highlight
+                document.querySelectorAll('.bin-zone').forEach(b => b.classList.remove('drag-over'));
+            });
+        }
+
+        function highlightBinUnderTouch(x, y) {
+            document.querySelectorAll('.bin-zone').forEach(b => b.classList.remove('drag-over'));
+            const target = document.elementFromPoint(x, y);
+            const bin = target ? target.closest('.bin-zone') : null;
+            if(bin) bin.classList.add('drag-over');
+        }
+
+        // --- LÓGICA DAS LIXEIRAS ---
+        const bins = document.querySelectorAll('.bin-zone');
+        bins.forEach(bin => {
+            // Drop Desktop
+            bin.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                bin.classList.add('drag-over');
+            });
+            bin.addEventListener('dragleave', () => bin.classList.remove('drag-over'));
+            bin.addEventListener('drop', (e) => {
+                e.preventDefault();
+                bin.classList.remove('drag-over');
+                checkAnswer(bin.dataset.type);
+            });
+        });
+
+        // Fallback: Clique na lixeira (caso o drag falhe ou para acessibilidade)
+        window.clickBin = function(type) {
+            if(currentItem) checkAnswer(type);
+        }
+
+        function checkAnswer(binType) {
+            if(!currentItem) return;
+
+            if(binType === currentItem.type) {
+                // Acerto
+                score += 100;
+                updateScore(score);
+                spawnItem();
+            } else {
+                // Erro
+                score = Math.max(0, score - 50);
+                updateScore(score);
+                showFeedback(currentItem.tip);
+            }
+        }
+
+        function showFeedback(msg) {
+            const box = document.getElementById('feedback-msg');
+            box.textContent = msg;
+            box.classList.remove('hidden');
+            box.classList.add('animate-shake');
+            
+            // Pausa o jogo visualmente escondendo o item
+            document.getElementById('spawner').innerHTML = '';
+
+            setTimeout(() => {
+                box.classList.add('hidden');
+                box.classList.remove('animate-shake');
+                spawnItem();
+            }, 2500);
+        }
+
+        function updateScore(val) {
+            document.getElementById('score-display').textContent = val;
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('end-screen').classList.remove('hidden');
+            
+            document.getElementById('cert-name').textContent = playerName;
+            document.getElementById('final-score').textContent = score + ' pts';
+        }
+    </script>
+</body>
+</html>
